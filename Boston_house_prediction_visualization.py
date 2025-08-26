@@ -11,7 +11,6 @@ from sklearn.metrics import r2_score, mean_squared_error
 import matplotlib.pyplot as plt
 import seaborn as sns
 
-# Configure Streamlit page
 st.set_page_config(
     page_title="California House Price Map",
     page_icon="🏠",
@@ -20,21 +19,17 @@ st.set_page_config(
 )
 
 
-# Cache data loading for better performance
 @st.cache_data
 def load_data():
-    """Load and prepare the California housing dataset"""
     california_housing = fetch_california_housing(as_frame=True)
     df = california_housing.frame
 
-    # Add price categories for color coding
     df['price_category'] = pd.cut(df['MedHouseVal'],
                                   bins=[0, 1.5, 3.0, 4.5, 6.0],
                                   labels=['Low ($0-150k)', 'Medium ($150-300k)',
                                           'High ($300-450k)', 'Very High ($450k+)'],
                                   include_lowest=True)
 
-    # Create price per sqft approximation
     df['price_per_room'] = df['MedHouseVal'] / df['AveRooms']
 
     return df
@@ -42,7 +37,6 @@ def load_data():
 
 @st.cache_data
 def train_model(df):
-    """Train the Random Forest model"""
     feature_columns = ['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms',
                        'Population', 'AveOccup', 'Latitude', 'Longitude']
 
@@ -54,7 +48,6 @@ def train_model(df):
     model = RandomForestRegressor(n_estimators=100, random_state=42)
     model.fit(X_train, y_train)
 
-    # Calculate metrics
     y_pred = model.predict(X_test)
     r2 = r2_score(y_test, y_pred)
     rmse = np.sqrt(mean_squared_error(y_test, y_pred))
@@ -63,19 +56,15 @@ def train_model(df):
 
 
 def main():
-    # Title and description
     st.title("California House Price Interactive Map")
     st.markdown(
         "Explore house prices across California with interactive visualizations and machine learning predictions.")
 
-    # Load data
     with st.spinner("Loading California housing data..."):
         df = load_data()
 
-    # Sidebar controls
     st.sidebar.header("Map Controls")
 
-    # Sample size selector
     sample_size = st.sidebar.slider(
         "Sample Size (for performance)",
         min_value=1000,
@@ -85,7 +74,6 @@ def main():
         help="Reduce sample size for better performance"
     )
 
-    # Price range filter
     min_price, max_price = st.sidebar.slider(
         "Price Range (in $100k)",
         min_value=float(df['MedHouseVal'].min()),
@@ -94,34 +82,29 @@ def main():
         step=0.1
     )
 
-    # Color scheme selector
     color_scheme = st.sidebar.selectbox(
         "Color Scheme",
         ["Viridis", "Plasma", "Inferno", "Turbo", "RdYlBu_r"],
         index=0
     )
 
-    # Map type selector
     map_type = st.sidebar.selectbox(
         "Map Visualization",
         ["Scatter Plot", "Density Heatmap", "3D Surface"],
         index=0
     )
 
-    # Filter data
     df_filtered = df[
         (df['MedHouseVal'] >= min_price) &
         (df['MedHouseVal'] <= max_price)
         ].sample(n=min(sample_size, len(df)), random_state=42)
 
-    # Main content area
     col1, col2 = st.columns([2, 1])
 
     with col1:
         st.subheader("House Price Distribution Map")
 
         if map_type == "Scatter Plot":
-            # Create scatter plot map
             fig = px.scatter_mapbox(
                 df_filtered,
                 lat="Latitude",
@@ -144,7 +127,6 @@ def main():
             )
 
         elif map_type == "Density Heatmap":
-            # Create density heatmap
             fig = px.density_mapbox(
                 df_filtered,
                 lat="Latitude",
@@ -157,8 +139,7 @@ def main():
                 title="House Price Density Heatmap"
             )
 
-        else:  # 3D Surface
-            # Create 3D surface plot
+        else:
             fig = go.Figure(data=[go.Scatter3d(
                 x=df_filtered['Longitude'],
                 y=df_filtered['Latitude'],
@@ -199,7 +180,6 @@ def main():
     with col2:
         st.subheader("Price Statistics")
 
-        # Key metrics
         col_a, col_b = st.columns(2)
         with col_a:
             st.metric(
@@ -222,7 +202,6 @@ def main():
                 f"{len(df_filtered):,}"
             )
 
-        # Price distribution
         st.subheader("Price Distribution")
         price_dist = df_filtered['price_category'].value_counts()
         fig_pie = px.pie(
@@ -233,7 +212,6 @@ def main():
         fig_pie.update_layout(height=300, showlegend=False)
         st.plotly_chart(fig_pie, use_container_width=True)
 
-        # Top expensive areas
         st.subheader("Most Expensive Areas")
         top_expensive = df_filtered.nlargest(5, 'MedHouseVal')[
             ['Latitude', 'Longitude', 'MedHouseVal', 'MedInc']
@@ -242,7 +220,6 @@ def main():
         for idx, row in top_expensive.iterrows():
             st.write(f"**${row['MedHouseVal']}00k** - ({row['Latitude']}, {row['Longitude']})")
 
-    # Machine Learning Section
     st.header("Machine Learning Predictions")
 
     col1, col2 = st.columns([1, 1])
@@ -252,14 +229,12 @@ def main():
         with st.spinner("Training Random Forest model..."):
             model, r2, rmse, X_test, y_test, y_pred = train_model(df)
 
-        # Display metrics
         col_a, col_b = st.columns(2)
         with col_a:
             st.metric("R² Score", f"{r2:.4f}")
         with col_b:
             st.metric("RMSE", f"${rmse:.2f}00k")
 
-        # Actual vs Predicted plot
         fig_scatter = px.scatter(
             x=y_test,
             y=y_pred,
@@ -276,7 +251,6 @@ def main():
     with col2:
         st.subheader("Let Us Make a Prediction")
 
-        # Input features for prediction
         med_inc = st.number_input("Median Income", min_value=0.5, max_value=15.0, value=5.0, step=0.1)
         house_age = st.number_input("House Age", min_value=1.0, max_value=52.0, value=10.0, step=1.0)
         ave_rooms = st.number_input("Average Rooms", min_value=2.0, max_value=20.0, value=6.0, step=0.1)
@@ -287,15 +261,11 @@ def main():
         longitude = st.number_input("Longitude", min_value=-125.0, max_value=-114.0, value=-118.0, step=0.1)
 
         if st.button("Predict Price", type="primary"):
-            # Make prediction
             features = np.array([[med_inc, house_age, ave_rooms, ave_bedrms,
                                   population, ave_occup, latitude, longitude]])
             prediction = model.predict(features)[0]
 
-            # Display prediction
             st.success(f"**Predicted Price: ${prediction:.2f}00k**")
-
-            # Find similar properties
             df_similar = df[
                 (abs(df['Latitude'] - latitude) < 1) &
                 (abs(df['Longitude'] - longitude) < 1)
@@ -309,7 +279,6 @@ def main():
                 else:
                     st.write("Below average for the area")
 
-    # Feature Importance
     st.subheader("Feature Importance")
     feature_names = ['MedInc', 'HouseAge', 'AveRooms', 'AveBedrms',
                      'Population', 'AveOccup', 'Latitude', 'Longitude']
@@ -327,11 +296,9 @@ def main():
     )
     st.plotly_chart(fig_importance, use_container_width=True)
 
-    # Data Explorer
     with st.expander("Explore Raw Data"):
         st.dataframe(df_filtered.head(100))
 
-        # Download button
         csv = df_filtered.to_csv(index=False)
         st.download_button(
             label="Download filtered data as CSV",
